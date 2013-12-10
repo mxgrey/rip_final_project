@@ -184,64 +184,156 @@ The algorithm which combines the above three components can be expressed with th
             }
         }
     }
-    return $true$\;
+    generate\_cubic\_spline\_to\_new\_state()\;
 
 \end{algorithm}
 
-\subsection{Experiments}
+\section{EXPERIMENTS}
 
 There are three scenarios which are of primary concern for this algorithm
 
 \begin{itemize}
 \item The end effector has been instructed to run through an obstacle.
+\item The instructed trajectory runs through an obstacle
+\item The instructed trajectory causes a self-collision
+\end{itemize}
+
+Each of these scenarios is addressed in the following subsections.
+
+\subsection{End effector collision}
+
+Suppose a trajectory exists with the goal of grabbing or manipulating an object in some way, but that object has been shifted from its original position. As a result, the robot would hit the object or potentially smash it in a way that could be dangerous or damaging. This paper's algorithm is well-suited for handling this scenario. 
+
+\begin{figure}[h]
+    \includegraphics[width=\columnwidth]{pictures/grab_collide_closeup}
+    \caption{Robot hand smashing through obstacle}
+    \label{fig:grab_collide}
+\end{figure}
+
+Figure \ref{fig:grab_collide} shows a visualization of the detection that the hand has attempted to pass through the obstacle. The yellow and orange dots indicate the ``deepest'' points of intersection for the blue box (obstacle) and the robot's hand respectively. The yellow/orange arrow indicates the direction of travel for each object which would most quickly relieve the collision. This is the direction that the algorithm will use to resolve the collision. This resolution can be seen in Fig. \ref{fig:grab_resolved}.
+
+\begin{figure}[h]
+    \includegraphics[width=\columnwidth]{pictures/grab_resolved_closeup}
+    \caption{Robot gently touching obstacle}
+    \label{fig:grab_resolved}
+\end{figure}
+
+This allows a scenario such as Fig. \ref{fig:grab_collide_full} to be resolved into Fig. \ref{fig:grab_resolved_full}.
+
+\begin{figure}[h]
+    \begin{subfigure}[h]{\columnwidth}
+        \includegraphics[width=\columnwidth]{pictures/grab_collide}
+        \caption{Robot crushing obstacle}
+        \label{fig:grab_collide_full}
+    \end{subfigure}
+    \begin{subfigure}[h]{\columnwidth}
+        \includegraphics[width=\columnwidth]{pictures/grab_resolved}
+        \caption{Robot gently embracing obstacle}
+        \label{fig:grab_resolved_full}
+    \end{subfigure}
+\end{figure}
 
 
+\subsection{Collision along the path}
 
-\section{USING THE TEMPLATE}
+Suppose a trajectory was generated prior to the existence of an obstacle in the environment. Suppose also that not enough time is available to replan, or perhaps it is already being executed live. In many cases, our algorithm is well-suited to allow the safe execution of the trajectory using modifications that can occur in real-time.
 
-Use this sample document as your LaTeX source file to create your document. Save this file as {\bf root.tex}. You have to make sure to use the cls file that came with this distribution. If you use a different style file, you cannot expect to get required margins. Note also that when you are creating your out PDF file, the source file is only part of the equation. {\it Your \TeX\ $\rightarrow$ PDF filter determines the output file size. Even if you make all the specifications to output a letter file in the source - if your filter is set to produce A4, you will only get A4 output. }
+Figure \ref{fig:mirror} shows a sequence where an obstacle has been introduced on the left side of the robot while it is running a trajectory that expected that space to be clear. The original instruction to the robot had the two arms mirroring each other, so you can see how our algorithm has deformed the robot's original trajectory in order to achieve the goal while minimally affecting the path of the left hand.
 
-It is impossible to account for all possible situation, one would encounter using \TeX. If you are using multiple \TeX\ files you must make sure that the ``MAIN`` source file is called root.tex - this is particularly important if your conference is using PaperPlaza's built in \TeX\ to PDF conversion tool.
-
-\subsection{Headings, etc}
-
-Text heads organize the topics on a relational, hierarchical basis. For example, the paper title is the primary text head because all subsequent material relates and elaborates on this one topic. If there are two or more sub-topics, the next level head (uppercase Roman numerals) should be used and, conversely, if there are not at least two sub-topics, then no subheads should be introduced. Styles nprescribed.
-
-\subsection{Figures and Tables}
-
-Positioning Figures and Tables: Place figures and tables at the top and bottom of columns. Avoid placing them in the middle of columns. Large figures and tables may span across both columns. Figure captions should be below the figures; table heads should appear above the tables. Insert figures and tables after they are cited in the text. Use the ab even at the beginning of a sentence.
-
-\begin{table}[h]
-\caption{An Example of a Table}
-\label{table_example}
+\begin{figure}[h]
 \begin{center}
-\begin{tabular}{|c||c|}
-\hline
-One & Two\\
-\hline
-Three & Four\\
-\hline
-\end{tabular}
+    \begin{subfigure}[h]{0.45\columnwidth}
+        \includegraphics[width=\columnwidth]{pictures/mirror_1}
+        \label{fig:mirror1}
+    \end{subfigure}
+    \begin{subfigure}[h]{0.45\columnwidth}
+        \includegraphics[width=\columnwidth]{pictures/mirror_2}
+        \label{fig:mirror2}
+    \end{subfigure}
+    \begin{subfigure}[h]{0.45\columnwidth}
+        \includegraphics[width=\columnwidth]{pictures/mirror_3}
+        \label{fig:mirror3}
+    \end{subfigure}
+    \begin{subfigure}[h]{0.45\columnwidth}
+        \includegraphics[width=\columnwidth]{pictures/mirror_4}
+        \label{fig:mirror4}
+    \end{subfigure}
+    \begin{subfigure}[h]{0.45\columnwidth}
+        \includegraphics[width=\columnwidth]{pictures/mirror_5}
+        \label{fig:mirror5}
+    \end{subfigure}
+    \begin{subfigure}[h]{0.45\columnwidth}
+        \includegraphics[width=\columnwidth]{pictures/mirror_6}
+        \label{fig:mirror6}
+    \end{subfigure}
+    \caption{Left arm avoiding an obstacle}
+    \label{fig:mirror}
 \end{center}
-\end{table}
+\end{figure}
 
 
-   \begin{figure}[thpb]
-      \centering
-      \framebox{\parbox{3in}{We suggest that you use a text box to insert a graphic (which is ideally a 300 dpi TIFF or EPS file, with all fonts embedded) because, in an document, this method is somewhat more stable than directly inserting a picture.
-}}
-      %\includegraphics[scale=1.0]{figurefile}
-      \caption{Inductance of oscillation winding on amorphous
-       magnetic core versus DC bias magnetic field}
-      \label{figurelabel}
-   \end{figure}
-   
+The corrections seen here were generated at a rate of 650 Hz (650 trajectory timesteps per second) on an i5 Desktop. The DRC-Hubo operates at 200 Hz (timesteps per second). This tells us that the corrections could be applied in real-time as part of a control loop on the robot, because the trajectory timesteps are being generated at 3x the speed which they would be executed.
 
-Figure Labels: Use 8 point Times New Roman for Figure labels. Use words rather than symbols or abbreviations when writing Figure axis labels to avoid confusing the reader. As an example, write the qutincluding units inatio
 
-\section{CONCLUSIONS}
+\subsection{Self-collision avoidance}
 
-A conclusion section is not required. Although a conclusion may review the main points of the paper, do not replicate the abstract as the conclusion. A conclusion might elaborate on the importance of the work or suggest applications and extensions. 
+Suppose the robot is being operated by a human who is making poor decisions, and the human operator sends an instruction which would produce a self-collision. Our algorithm is well-suited for resolving this conflict of interest in real time. An example of such a collision can be seen in Fig. \ref{fig:eh_col}. The resolved versions (after the algorithm has been applied) can be seen in Fig. \ref{fig:eh_avoid}. Also a resolution for Fig. \ref{fig:thigh_punch_collision} from the beginning of this paper can be seen in \ref{fig:thigh_punch_resolved}.
+
+\begin{figure}[h]
+\begin{center}
+    \begin{subfigure}[h]{0.45\columnwidth}
+        \includegraphics[width=\columnwidth]{pictures/elbow_hip_3}
+        \label{fig:eh3}
+    \end{subfigure}
+    \begin{subfigure}[h]{0.45\columnwidth}
+        \includegraphics[width=\columnwidth]{pictures/elbow_hip_4}
+        \label{fig:eh4}
+    \end{subfigure}
+    \caption{Left elbow collision with hip}
+    \label{fig:eh_col}
+\end{center}
+\end{figure}
+
+\begin{figure}[h]
+\begin{center}
+    \begin{subfigure}[h]{0.45\columnwidth}
+        \includegraphics[width=\columnwidth]{pictures/elbow_hip_1}
+        \label{fig:eh1}
+    \end{subfigure}
+    \begin{subfigure}[h]{0.45\columnwidth}
+        \includegraphics[width=\columnwidth]{pictures/elbow_hip_2}
+        \label{fig:eh2}
+    \end{subfigure}
+    \caption{Left elbow avoiding collision with hip}
+    \label{fig:eh_avoid}
+\end{center}
+\end{figure}
+
+
+\begin{figure}[h]
+    \includegraphics[width=\columnwidth]{pictures/thigh_punch_resolved}
+    \caption{Robot hand avoiding its own leg}
+    \label{fig:thigh_punch_resolved}
+\end{figure}
+
+
+\section{ANALYSIS}
+
+This algorith makes absolutely no attempt to offer completeness. In fact, it is not at all hard to set up scenarios where the algorithm is unable to remedy a trajectory, specifically if an object's path is perpindicular to the collision geometry of an obstacle which it is about to hit, the best this algorithm can do is safely halt the motion of the trajectory. Similarly, if the trajectory is directed into a ``corner'' of obstacles, the best that the algorithm can do is halt.
+
+The algorithm makes some notional effort to optimize ``safety'' in the sense that it generates paths which satisfy velocity and acceleration limits. However, it does not make any effort to optimize path length, joint torque, or any physical characteristics besides velocity and acceleration of joints and end effectors.
+
+Instead, the objective of this algorithm is to provide a critical layer of safety to robot operation to avoid collisions in real time with minimal interference to the original trajectory. This aspect is certainly achieved, and future work will focus on implementing this on the physical DRC-Hubo with sensor-based obstacle detection in the loop. Since the collision detection environment does not currently accept point clouds, we cannot close the loop yet.
+
+The use of splines instead of the tradition potential field approach turns out to be mostly stylistic in nature. The effect it has is to keep the robot's entire body in sync in the even that one appendage needs to make a major adjustment. Using potential fields, the right arm might continue along to its next goal while the left arm is in the process of struggling to escape a collision. Which behavior is desired is mostly a question of application and preference. For a humanoid robot that exhibits many kinematic and dynamic constraints, it is likely preferable that the body remain in sync as much as possible at all times.
+
+\section{Discussion}
+
+Since all local gradient descent methods are subject to getting stuck in local minima, this algorithm is not a viable approach for arbitrarily complex situations. Full body planners would be required, but that is only relevant if the computational resources are available to generate a full body plan.
+
+Motion primitives are a popular approach in humanoid robotics, and it would make sense to apply this algorithm to a set of primitives which did not originally account for some obstacles that have been introduced to the environment. This could prove to be a reasonable compromise between a complete planner and a local gradient descent method.
+
+Future work for the author is likely to include investigation into methods to perform full body planning which leverages the kinematics and dynamics of the robot to generate more robust plans in a reasonable amount of time. Essentially, try to find an intersection between probabilistically complete algorithms and gradient descent methods which offers a viable framework for generating full body plans on robots with degrees of freedom on the order of humanoid robots.
 
 \addtolength{\textheight}{-12cm}   % This command serves to balance the column lengths
                                   % on the last page of the document manually. It shortens
@@ -259,18 +351,14 @@ A conclusion section is not required. Although a conclusion may review the main 
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section*{APPENDIX}
-
-Appendixes should appear before the acknowledgment.
 
 \section*{ACKNOWLEDGMENT}
 
-Many thanks to Matt Zucker who provided the collision detection, kinematics, and visualization environment that made this project possible.
+Many thanks to Matt Zucker who provided the collision detection and visualization environment that made this project possible.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-References are important to the reader; therefore, each citation must be complete and correct. If at all possible, references should be commonly available publications.
 
 
 
