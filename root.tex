@@ -6,8 +6,11 @@
 
 \usepackage{hyperref}
 \usepackage{graphicx}
-\usepackage{subfig}
+%\usepackage{subfig}
+\usepackage{caption}
 \usepackage{subcaption}
+\usepackage{mathtools}
+\usepackage{algorithm2e}
 %\documentclass[a4paper, 10pt, conference]{ieeeconf}      % Use this line for a4 paper
 
 \IEEEoverridecommandlockouts                              % This command is only needed if 
@@ -73,80 +76,125 @@ Instead, for the sake of efficiency, this paper explores an algorithm analogous 
 
 \section{METHODS}
 
+There are three primary components to the algorithm used for this project. At the end of this section we provide an overview for how these components work together.
+
 \subsection{Convex Continuous Collision Detection}
 
 The first key component of the algorithm is the ability to continuously detect collisions between convex geometries. This was noted as a requirement by Khatib for the use of potential fields \cite{Khatib}. To this end, the algorithm uses libccd\footnote{Information on libccd can be found here: \url{http://libccd.danfis.cz/about}}. ``Continuous collision detection'' in this context means that, in addition to simply identifying when a collision occurs, we know which point on each geometry most deeply intersects the offending geometry. This also means that we have a vector to indicate what direction each geometry could be moved in to reduce the amount of collision, as seen in Fig. \ref{fig:thigh_punch_collision}. 
 
 \begin{figure}[h]
-\includegraphics[width=\columnwidth]{pictures/thigh_punch_collision}
-\caption{Collision geometry and collision normals of the left fist in the left thigh}
-\label{fig:thigh_punch_collision}
+    \includegraphics[width=\columnwidth]{pictures/thigh_punch_collision}
+    \caption{Collision geometry and collision normals of the left fist in the left thigh}
+    \label{fig:thigh_punch_collision}
 \end{figure}
 
-The collision geometries are generally represented as spheres, capsules (a.k.a. pills or cylinders with spherical caps), and boxes. These are simple convex shapes which do a respectable job of encapsulating the complex geometry of the robot. By combining these shapes in clever ways (see Fig. , they can offer a good compromise between accuracy, safety buffer, and efficiency. 
+The collision geometries are generally represented as spheres, capsules (a.k.a. pills or cylinders with spherical caps), and boxes. These are simple convex shapes which do a respectable job of encapsulating the complex geometry of the robot. By combining these shapes in clever ways, they can offer a good compromise between accuracy, safety buffer, and efficiency. In Fig. \ref{fig:col_geoms} we see the collision geometries of various body parts (represented by the technicolor lines and curves, \emph{not} the solid model). The arm is long and slender, so it uses mostly capsules to represent its volume (Fig. \ref{fig:arm_col_geoms}. The actual chest is close to being a cube, so that is encapsulated with one large box (Fig. \ref{fig:chest_col_geom}). In order to get the many-sided polygon for the pelvis (Fig. \ref{fig:pelvis_col_geom}) a series of boxes are strung together at angles with each other. It may seem like a strange approach for constructing complicated shapes, but it allows the collision detection library to make assumptions that provide quick analytical results for continuous collision detection. It is usually okay--sometimes even desirable--to sloppily overestimate the physical volume of the robot links, as long as the overestimation does not produce false negatives that impede viable solutions. 
 
 \begin{figure}[h]
-\subfigure{\label{fig:arm_col_geoms}
-\subcaption[Arm collision geometries]
-\includegraphics[width=\columnwidth]{pictures/arm_col_geom}}
-\subfigure[Chest collision geometry]{\label{fig:chest_col_geom}
-\includegraphics[width=\columnwidth]{pictures/chest_col_geom}}
-\subfigure[Pelvis collision geometry]{\label{fig:pelvis_col_geom}
-\includegraphics[width=\columnwidth]{pictures/pelvis_col_geom}}
-\label{fig:col_geoms}
+    \centering
+    \begin{subfigure}[h]{1.0\columnwidth}
+        \includegraphics[width=\columnwidth]{pictures/arm_col_geom}
+        \caption{Arm collision geometries}
+        \label{fig:arm_col_geoms}
+    \end{subfigure}
+    \begin{subfigure}[h]{0.45\columnwidth}
+        \includegraphics[width=\columnwidth]{pictures/chest_col_geom}
+        \caption{Chest collision geometries}
+        \label{fig:chest_col_geom}
+    \end{subfigure}
+    \begin{subfigure}[h]{0.45\columnwidth}
+        \includegraphics[width=\columnwidth]{pictures/pelvis_col_geom}
+        \caption{Pelvis collision geometries}
+        \label{fig:pelvis_col_geom}
+    \end{subfigure}
+    \caption{Collision geometries of various parts of the robot}
+    \label{fig:col_geoms}
 \end{figure}
 
-\subsection{Maintaining the Integrity of the Specifications}
+\subsection{Jacobian Descent}
 
-The template is used to format your paper and style the text. All margins, column widths, line spaces, and text fonts are prescribed; please do not alter them. You may note peculiarities. For example, the head margin in this template measures proportionately more than is customary. This measurement and others are deliberate, using specifications that anticipate your paper as one part of the entire proceedings, and not as an independent document. Please do not revise any of the current designations
+Leveraging the continuous collision detection, we can use the pseudo-inverse Jacobian to find a joint configuration which is close to the original but collision-free. The Jacobian of a robot kinematic chain describes the mapping from joint speeds to end effector speeds. In this case, the "end-effector" can be thought of as any kinematic body which is in collision. So if the elbow is in collision, we treat the elbow frame as the end-effector frame (even though traditionally the hand of the robot would be considered its end-effector). We take the Jacobian which leads from the root of the kinematic tree up to the object which is in collision and use that to inform our iterative procedure.
 
-\section{MATH}
+Specifically, a damped least squares pseudo-inverse Jacobian\footnote{An excellent explanation of inverse kinematics can be found at this website: \url{http://www.math.ucsd.edu/~sbuss/ResearchWeb/ikmethods/iksurvey.pdf}} is used to calculate changes in joint angles. This takes the form of Eq. \ref{eq:PIJ} where $J_{c}$ is the Jacobian of the point which is in collision, $\Delta \vec{\theta}$ is the change in joint angles, $\Delta \vec{x}$ is the desired displacement, and $\lambda$ is an arbitrary damping factor (0.05 was chosen for this project). Note that Jacobians are often used to control both end effector translation and orientation, but in this case we only care about translating the links away from collisions and are unconcerned about their rotation. Therefore, we ignore the rotational components of the Jacobian.
 
-Before you begin to format your paper, first write and save the content as a separate text file. Keep your text and graphic files separate until after the text has been formatted and styled. Do not use hard tabs, and limit use of hard returns to only one return at the end of a paragraph. Do not add any kind of pagination anywhere in the paper. Do not number text heads-the template will do that for you.
+\begin{equation}
+    \Delta \vec{\theta} = J_{c}^{T} ( J_{c} J_{c}^{T} + \lambda^{2} I )^{-1} \Delta \vec{x} 
+%    \caption{Damped least squares pseudo-inverse Jacobian method}
+    \label{eq:PIJ}
+\end{equation}
 
-Finally, complete content and organizational editing before formatting. Please take note of the following items when proofreading spelling and grammar:
+The Jacobian is used to progressively iterate the geometries out of their collisions. Each step taken through the Jacboian is clamped down to a 5$mm$ step. This step size is arbitrary, but it reflects a practical compromise between precision and efficiency. The attempt to resolve a particular collision terminates after 1000 iterations (again, an arbitrary value, but reflects a good balance), and the solver moves on to the next collision in the list hoping that solving for a different collision will resolve the first one. An alternative approach might attempt to address every collision in each iteration, but this runs a great risk of getting ``cornered'' in a local minimum where two collisions have opposing normals.
 
-\subsection{Abbreviations and Acronyms} Define abbreviations and acronyms the first time they are used in the text, even after they have been defined in the abstract. Abbreviations such as IEEE, SI, MKS, CGS, sc, dc, and rms do not have to be defined. Do not use abbreviations in the title or heads unless they are unavoidable.
+Additionally, we may be interested in preserving the pose of the manipulator (a.k.a. the robot's hand) while still moving the links of the arm out of collisions (assuming the manipulator itself is not presently in a collision). For this purpose, we can project $\Delta \vec{\theta}$ through the nullspace of manipulator's Jacobian. In order to find the nullspace of the manipulators' Jacobians, we employ the JacobiSVD found in the Eigen C++ library\footnote{More information on Eigen C++ can be found here: \url{http://eigen.tuxfamily.org/index.php?title=Main_Page}}. The JacobiSVD class produces a V Matrix which has columns that correspond to zero-valued singular values. These zeroed singular values form the basis of the Jacobian's nullspace, because they indicate vectors of joint angle changes which do not effect the pose of the manipulator. By simply extracting the block of the V Matrix corresponding to zero singular values and projecting the afrorementioned $\Delta \vec{\theta}$ through this basis, we get values of $\Delta \vec{\theta_{ns}}$ which move the links in the kinematic chain without moving the manipulator.
 
-\subsection{Units}
+\subsection{Cubic Splines}
+
+The final key component of the method used is cubic splining. Cubic splines have useful properties for efficiently interpolating full body trajectories. Specifically, it is possible to dictate the initial and final position and velocity of a cubic spline. And even more crucially, there are analytical solutions for how to scale a cubic spline in order to achieve a given maximum velocity or acceleration. Velocity and acceleration limits are of critical importance for robot applications since exceeding these limits can result in damage to the robot or the robot's environment. Cubic splines offer a single framework which allows us to efficiently make continuously differentiable corrections to trajectories.
+
+When altering a full body trajectory for a humanoid robot like the DRC-Hubo, it is critical to ensure that the entire body moves synchronously. If, for example, an arm needs to be slowed down in order to avoid a collision, it is important that the entire body be slowed down in sync with it, for two particular reasons
 
 \begin{itemize}
-
-\item Use either SI (MKS) or CGS as primary units. (SI units are encouraged.) English units may be used as secondary units (in parentheses). An exception would be the use of English units as identifiers in trade, such as “3.5-inch disk drive”.
-\item Avoid combining SI and CGS units, such as current in amperes and magnetic field in oersteds. This often leads to confusion because equations do not balance dimensionally. If you must use mixed units, clearly state the units for each quantity that you use in an equation.
-\item Do not mix complete spellings and abbreviations of units: “Wb/m2” or “webers per square meter”, not “webers/m2”.  Spell out units when they appear in text: “. . . a few henries”, not “. . . a few H”.
-\item Use a zero before decimal points: “0.25”, not “.25”. Use “cm3”, not “cc”. (bullet list)
-
+\item The body needs to maintain balance. Full body trajectories for humanoid robots are (ideally) generated in such a way that they remain balanced. If a subset of the joints in the trajectory are sped up or slowed down, it might destroy assumptions made by the original trajectory in order to maintain balance.
+\item A trajectory might have been designed with kinematic constraints between different manipulators (or between the feet supporting it), and these kinematic constraints are likely to be violated if one manipulator moves faster than the other. For example, if both hands are holding the same object, their velocities need to match each other, or the robot will not be able to maintain a hold on the object (and will potentially break the object or break itself).
 \end{itemize}
 
+When altering a trajectory, we consider the strictest velocity/acceleration limit on the robot--in other words, the velocity (or acceleration) limit which results in the most time required to transition from the start configuration to the end configuration. This limit is used to inform the necessary interpolation time for the cubic spline. Equations \ref{eq:max_vel} and \ref{eq:max_accel} indicate the relationship between velocity / acceleration limits and the time necessary for interpolation. $T_{max\_vel}$ is the length of time required to satisfy the maximum velocity limit of a feature, $T_{max\_accel}$ is the lenght of time required to satisfy the acceleration limit of a feature, $D$ is the total displacement of the feature from the start to the end, $V_{max}$ is the feature's maximum velocity, and $A_{max}$ is the feature's maximum acceleration. $v_0$ is the initial (and final) \emph{unitless} velocity. Unitless means that it is scaled to the velocity of some other cubic spline, and it can range from 0 to 1.5 (because 1.5 is the maximum velocity of a cubic spline which goes from 0 to 1 while beginning and ending with 0 velocity).
 
-\subsection{Equations}
+\begin{equation}
+    T_{max\_vel} = \frac{(3 - v_{0})D}{2 V_{max}}
+    \label{eq:max_vel}
+\end{equation}
 
-The equations are an exception to the prescribed specifications of this template. You will need to determine whether or not your equation should be typed using either the Times New Roman or the Symbol font (please no other font). To create multileveled equations, it may be necessary to treat the equation as a graphic and insert it into the text after your paper is styled. Number equations consecutively. Equation numbers, within parentheses, are to position flush right, as in (1), using a right tab stop. To make your equations more compact, you may use the solidus ( / ), the exp function, or appropriate exponents. Italicize Roman symbols for quantities and variables, but not Greek symbols. Use a long dash rather than a hyphen for a minus sign. Punctuate equations with commas or periods when they are part of a sentence, as in
+\begin{equation}
+    T_{max\_accel} = \sqrt{ \left| \frac{6(1-v_{0})D}{A_{max}} \right| }
+    \label{eq:max_accel}
+\end{equation}
 
-$$
-\alpha + \beta = \chi \eqno{(1)}
-$$
+For our purposes, the cubic splines will always have the same initial and final velocity, although this is not an inherent requirement of cubic splines. We do this because a complete trajectory must always begin and end with zero velocity (i.e. the same velocity), and when we modify a trajectory, it is desirable for our modified segment to end with the same velocity that it began with in order to be continuous and allow the rest of the trajectory to behave as it originally expected. In this way, we can ensure that we continue to respect velocity and acceleration limits while still avoiding collisions. Fig. \ref{fig:splines} displays the complete range of splines which are permitted by the algorithm.
 
-Note that the equation is centered using a center tab stop. Be sure that the symbols in your equation have been defined before or immediately following the equation. Use “(1)”, not “Eq. (1)” or “equation (1)”, except at the beginning of a sentence: “Equation (1) is . . .”
+\begin{figure}[h]
+    \includegraphics[width=\columnwidth]{pictures/splines}
+    \caption{Splines with varying initial (unitless) velocities: blue=0, red=1.5. Dashed lines represent the corresponding first-order derivatives.}
+    \label{fig:splines}
+\end{figure}
 
-\subsection{Some Common Mistakes}
+\subsection{Complete Algorithm}
+
+The algorithm which combines the above three components can be expressed with the following pseudo-code.
+
+\begin{algorithm}
+
+    \SetLine
+    \KwData{$collision\_list$, $robot\_state$}
+    \While{collision\_list.notEmpty()} {
+        \For{ collision $\leftarrow$ collision\_list } {
+            $J_{c}$ $\leftarrow$ Jacobian($collision$, $robot\_state$)\;
+            $J_{c}^{-1}$ $\leftarrow$ dampedPseudoInverse($J_{c}$)\;
+            $\Delta \vec{\theta}$ $\leftarrow$ $J_{c}^{-1}$ * $collision$.normal\_vector()\;
+            \For{ manip $\leftarrow$ manipulator\_list } {
+                \If{collision != manip} {
+                    $J_{m}$ $\leftarrow$ Jacobian($manip$, $robot\_state$)\;
+                    $\Delta \vec{\theta}$ $\leftarrow$ nullspaceProjection($J_{m}$, $\Delta \vec{\theta}$)\;
+                }
+            }
+            $robot\_state$ $\leftarrow$ apply($\Delta \vec{\theta}$, $robot\_state$)\;
+            $attempt$++\;
+            \If{$attempt$ $\geq$ $maxAttempts$} {
+                return $false$\;
+            }
+        }
+    }
+    return $true$\;
+
+\end{algorithm}
+
+\subsection{Experiments}
+
+There are three scenarios which are of primary concern for this algorithm
+
 \begin{itemize}
+\item The end effector has been instructed to run through an obstacle.
 
-
-\item The word “data” is plural, not singular.
-\item The subscript for the permeability of vacuum ?0, and other common scientific constants, is zero with subscript formatting, not a lowercase letter “o”.
-\item In American English, commas, semi-/colons, periods, question and exclamation marks are located within quotation marks only when a complete thought or name is cited, such as a title or full quotation. When quotation marks are used, instead of a bold or italic typeface, to highlight a word or phrase, punctuation should appear outside of the quotation marks. A parenthetical phrase or statement at the end of a sentence is punctuated outside of the closing parenthesis (like this). (A parenthetical sentence is punctuated within the parentheses.)
-\item A graph within a graph is an “inset”, not an “insert”. The word alternatively is preferred to the word “alternately” (unless you really mean something that alternates).
-\item Do not use the word “essentially” to mean “approximately” or “effectively”.
-\item In your paper title, if the words “that uses” can accurately replace the word “using”, capitalize the “u”; if not, keep using lower-cased.
-\item Be aware of the different meanings of the homophones “affect” and “effect”, “complement” and “compliment”, “discreet” and “discrete”, “principal” and “principle”.
-\item Do not confuse “imply” and “infer”.
-\item The prefix “non” is not a word; it should be joined to the word it modifies, usually without a hyphen.
-\item There is no period after the “et” in the Latin abbreviation “et al.”.
-\item The abbreviation “i.e.” means “that is”, and the abbreviation “e.g.” means “for example”.
-
-\end{itemize}
 
 
 \section{USING THE TEMPLATE}
@@ -157,11 +205,11 @@ It is impossible to account for all possible situation, one would encounter usin
 
 \subsection{Headings, etc}
 
-Text heads organize the topics on a relational, hierarchical basis. For example, the paper title is the primary text head because all subsequent material relates and elaborates on this one topic. If there are two or more sub-topics, the next level head (uppercase Roman numerals) should be used and, conversely, if there are not at least two sub-topics, then no subheads should be introduced. Styles named “Heading 1”, “Heading 2”, “Heading 3”, and “Heading 4” are prescribed.
+Text heads organize the topics on a relational, hierarchical basis. For example, the paper title is the primary text head because all subsequent material relates and elaborates on this one topic. If there are two or more sub-topics, the next level head (uppercase Roman numerals) should be used and, conversely, if there are not at least two sub-topics, then no subheads should be introduced. Styles nprescribed.
 
 \subsection{Figures and Tables}
 
-Positioning Figures and Tables: Place figures and tables at the top and bottom of columns. Avoid placing them in the middle of columns. Large figures and tables may span across both columns. Figure captions should be below the figures; table heads should appear above the tables. Insert figures and tables after they are cited in the text. Use the abbreviation “Fig. 1”, even at the beginning of a sentence.
+Positioning Figures and Tables: Place figures and tables at the top and bottom of columns. Avoid placing them in the middle of columns. Large figures and tables may span across both columns. Figure captions should be below the figures; table heads should appear above the tables. Insert figures and tables after they are cited in the text. Use the ab even at the beginning of a sentence.
 
 \begin{table}[h]
 \caption{An Example of a Table}
@@ -189,7 +237,7 @@ Three & Four\\
    \end{figure}
    
 
-Figure Labels: Use 8 point Times New Roman for Figure labels. Use words rather than symbols or abbreviations when writing Figure axis labels to avoid confusing the reader. As an example, write the quantity “Magnetization”, or “Magnetization, M”, not just “M”. If including units in the label, present them within parentheses. Do not label axes only with units. In the example, write “Magnetization (A/m)” or “Magnetization {A[m(1)]}”, not just “A/m”. Do not label axes with a ratio of quantities and units. For example, write “Temperature (K)”, not “Temperature/K.”
+Figure Labels: Use 8 point Times New Roman for Figure labels. Use words rather than symbols or abbreviations when writing Figure axis labels to avoid confusing the reader. As an example, write the qutincluding units inatio
 
 \section{CONCLUSIONS}
 
@@ -217,8 +265,7 @@ Appendixes should appear before the acknowledgment.
 
 \section*{ACKNOWLEDGMENT}
 
-The preferred spelling of the word “acknowledgment” in America is without an “e” after the “g”. Avoid the stilted expression, “One of us (R. B. G.) thanks . . .”  Instead, try “R. B. G. thanks”. Put sponsor acknowledgments in the unnumbered footnote on the first page.
-
+Many thanks to Matt Zucker who provided the collision detection, kinematics, and visualization environment that made this project possible.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
